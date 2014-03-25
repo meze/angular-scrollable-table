@@ -115,12 +115,12 @@
       transclude: true,
       scope: true,
       require: '^scrollableTable',
-      template: '<div ng-mouseenter="enter()" ng-mouseleave="leave()">' + 
+      template: '<div ng-mouseenter="enter()" ng-mouseleave="leave()" ng-click="toggleSort()">' +
           '<div class="title" ng-transclude></div>' +
           '<span class="orderWrapper">' + 
-            '<span class="order" ng-show="focused || isActive()" ng-click="toggleSort()">' + 
-              '<i ng-show="isAscending()" class="icon-arrow-up"></i>' + 
-              '<i ng-show="!isAscending()" class="icon-arrow-down"></i>' + 
+            '<span class="order" ng-show="focused || isActive()">' +
+              '<i ng-show="isAscending()" class="fa fa-arrow-up"></i>' +
+              '<i ng-show="!isAscending()" class="fa fa-arrow-down"></i>' +
             '</span>' + 
           '</span>' + 
         '</div>',
