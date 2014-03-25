@@ -33,9 +33,8 @@
         this.doSort = function(comparatorFn) {
           if(comparatorFn) {
             $scope.rows.sort(function(r1, r2) {
-              var compared = comparatorFn(r1, r2);
-              return $scope.asc ? compared : compared * -1;
-            }); 
+              return comparatorFn(r1, r2, $scope.sortAttr, !$scope.asc);
+            });
           } else {
             $scope.rows.sort(function(r1, r2) {
               var compared = defaultCompare(r1[$scope.sortAttr], r2[$scope.sortAttr]);
