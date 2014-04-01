@@ -8,6 +8,7 @@
       restrict: 'E',
       scope: {
         rows: '=watch',
+        grid: '=',
         sortFn: '='
       },
       template: '<div class="scrollableContainer">' + 
@@ -41,6 +42,10 @@
               return $scope.asc ? compared : compared * -1;
             }); 
           }     
+        };
+
+        this.addHidableColumn = function(key, title) {
+          $scope.grid.hidableColumns.push({key: key, title: title});
         };
 
         function defaultCompare(x, y) {
@@ -104,6 +109,12 @@
           } 
         });
 
+        $scope.$watch('grid.hiddenColumns', function(newValue) {
+          if(newValue) {
+            $timeout(checkIfRendered);
+          }
+        }, true);
+
         $scope.asc = !$attrs.hasOwnProperty("desc");
         $scope.sortAttr = $attrs.sortAttr;
       }]
@@ -149,6 +160,10 @@
         scope.leave = function() {
           scope.focused = false;
         };
+
+        if (attrs.hidable) {
+          tableController.addHidableColumn(attrs.col, elm.text());
+        }
       }
     };
   })
