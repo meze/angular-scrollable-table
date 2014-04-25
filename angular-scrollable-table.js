@@ -73,7 +73,8 @@
             fixHeaderWidths();
           }
         }
-        function fixHeaderWidths() {        
+        function fixHeaderWidths() {
+          var hasScrollbar;
           if(!$element.find("thead th .th-inner").length)
             $element.find("thead th").wrapInner('<div class="th-inner"></div>');
 
@@ -83,7 +84,7 @@
             var width = el.parent().width() - padding; 
             // if it's the last header, add space for the scrollbar equivalent
             var lastCol = $element.find("table th:visible:last")[0] == el.parent()[0];
-            var hasScrollbar = $element.find(".scrollArea").height() < $element.find("table").height();
+            hasScrollbar = $element.find(".scrollArea").height() < $element.find("table").height();
             if(lastCol && hasScrollbar) {
               width += 18;
             }
@@ -91,12 +92,13 @@
             var title = el.parent().attr("title");
             if(el.children().length) {
               title = el.find(".title .ng-scope").html();
-            } 
+            }
             if(!title) {
               title = el.html();
             }
             el.attr("title", title);
           });
+          $element.find(".scrollableContainer").css("width", $element.find("table").width() + (hasScrollbar ? 18 : 0));
         }
 
         $(window).resize(fixHeaderWidths);
