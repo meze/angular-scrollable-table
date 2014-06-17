@@ -98,7 +98,7 @@
             }
             el.attr("title", title);
           });
-          $element.find(".scrollableContainer").css("width", $element.find("table").width() + (hasScrollbar ? 18 : 0));
+          $element.find(".scrollableContainer").css("width", $element.find(".fix-table-width").width());
         }
 
         $(window).resize(fixHeaderWidths);
