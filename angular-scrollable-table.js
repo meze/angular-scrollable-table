@@ -122,7 +122,7 @@
       }]
     };
   }])
-  .directive('sortableHeader', function() {
+  .directive('sortableHeader', ['translateFilter', function(translateFilter) {
     return { 
       transclude: true,
       scope: true,
@@ -164,10 +164,10 @@
         };
 
         if (attrs.hidable) {
-          tableController.addHidableColumn(attrs.col, elm.text());
+          tableController.addHidableColumn(attrs.col, elm.attr('translate') ? translateFilter(elm.attr('translate')) : elm.text());
         }
       }
     };
-  })
+  }])
   ;
 })(angular);
