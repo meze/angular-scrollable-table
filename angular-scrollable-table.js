@@ -137,6 +137,7 @@
           '</span>' + 
         '</div>',
       link: function(scope, elm, attrs, tableController) {
+        var column;
         scope.isActive = function() {
           return tableController.getSortCol() === attrs.col;
         };
@@ -164,7 +165,12 @@
         };
 
         if (attrs.hidable) {
-          tableController.addHidableColumn(attrs.col, elm.attr('translate') ? translateFilter(elm.attr('translate')) : elm.text());
+          var column = elm.find('.title > span');
+          if (!column.length) {
+            column = elm;
+          }
+
+          tableController.addHidableColumn(attrs.col, column.attr('translate') ? column.attr('translate') : column.text());
         }
       }
     };
