@@ -2,7 +2,7 @@
   'use strict';
   angular.module('scrollable-table', [])
 
-  .directive('scrollableTable', ['$timeout', function($timeout) {
+  .directive('scrollableTable', ['$timeout', '$q', '$parse', function($timeout, $q, $parse) {
     return { 
       transclude: true,
       restrict: 'E',
@@ -17,15 +17,15 @@
         '</div>',
       controller: ['$scope', '$element', '$attrs', function($scope, $element, $attrs) {
         // define an API for child directives to view and modify sorting parameters
-        this.getSortCol = function() {
-          return $scope.sortAttr;
+        this.getSortExpr = function() {
+          return $scope.sortExpr;
         };
         this.isAsc = function() {
           return $scope.asc;
         };
-        this.setSortCol = function(col) {
+        this.setSortExpr = function(exp) {
           $scope.asc = true;
-          $scope.sortAttr = col;
+          $scope.sortExpr = exp;
         };
         this.toggleSort = function() {
           $scope.asc = !$scope.asc;
@@ -34,95 +34,119 @@
         this.doSort = function(comparatorFn) {
           if(comparatorFn) {
             $scope.rows.sort(function(r1, r2) {
-              return comparatorFn(r1, r2, $scope.sortAttr, !$scope.asc);
+              return comparatorFn(r1, r2, $scope.sortExpr, !$scope.asc);
             });
           } else {
             $scope.rows.sort(function(r1, r2) {
-              var compared = defaultCompare(r1[$scope.sortAttr], r2[$scope.sortAttr]);
+              var compared = defaultCompare(r1, r2);
               return $scope.asc ? compared : compared * -1;
             }); 
           }     
         };
 
-        this.addHidableColumn = function(key, title) {
-          $scope.grid.hidableColumns.push({key: key, title: title});
-        };
+        function defaultCompare(row1, row2) {
+          var exprParts = $scope.sortExpr.match(/(.+)\s+as\s+(.+)/);
+          var scope = {};
+          scope[exprParts[1]] = row1;
+          var x = $parse(exprParts[2])(scope);
 
-        function defaultCompare(x, y) {
+          scope[exprParts[1]] = row2;
+          var y = $parse(exprParts[2])(scope);
+
           if (x === y) return 0;
           return x > y ? 1 : -1;
         }
 
-        var offset = $element.find(".headerSpacer").height();
+        function scrollToRow(row) {
+          var offset = $element.find(".headerSpacer").height();
+          var currentScrollTop = $element.find(".scrollArea").scrollTop();
+          $element.find(".scrollArea").scrollTop(currentScrollTop + row.position().top - offset);
+        }
+
         $scope.$on('rowSelected', function(event, rowId) {
-          var scrollArea = $element.find(".scrollArea");
-          var row = scrollArea.find("table tr[row-id='" + rowId + "']");
+          var row = $element.find(".scrollArea table tr[row-id='" + rowId + "']");
           if(row.length === 1) {
-            var currentScrollTop = scrollArea.scrollTop();
-            $element.find(".scrollArea").scrollTop(currentScrollTop + row.position().top - offset);
+            // Ensure that the headers have been fixed before scrolling, to ensure accurate
+            // position calculations
+            $q.all([waitForRender(), headersAreFixed.promise]).then(function() {
+              scrollToRow(row);
+            });
           }
         });
 
         // Set fixed widths for the table headers in case the text overflows.
-        // There's no callback for when rendering is complete, so check the width of the table 
+        // There's no callback for when rendering is complete, so check the visibility of the table
         // periodically -- see http://stackoverflow.com/questions/11125078
-        function checkIfRendered() {
-          if($element.find("table:visible").length === 0) {
-            $timeout(checkIfRendered, 100);
-          } else {
-            fixHeaderWidths();
+        function waitForRender() {
+          var deferredRender = $q.defer();
+          function wait() {
+            if($element.find("table:visible").length === 0) {
+              $timeout(wait, 100);
+            } else {
+              deferredRender.resolve();
+            }
           }
+          $timeout(wait);
+          return deferredRender.promise;
         }
+
+        var headersAreFixed = $q.defer();
         function fixHeaderWidths() {
-          var hasScrollbar;
           if(!$element.find("thead th .th-inner").length)
             $element.find("thead th").wrapInner('<div class="th-inner"></div>');
-
           $element.find("table th .th-inner").each(function(index, el) {
             el = $(el);
             var padding = el.outerWidth() - el.width();
             var width = el.parent().width() - padding; 
-            // if it's the last header, add space for the scrollbar equivalent
-            var lastCol = $element.find("table th:visible:last")[0] == el.parent()[0];
-            hasScrollbar = $element.find(".scrollArea").height() < $element.find("table").height();
-            if(lastCol && hasScrollbar) {
-              width += 18;
+            // if it's the last header, add space for the scrollbar equivalent unless it's centered
+            var lastCol = $element.find("table th:visible:last");
+            if(lastCol.css("text-align") !== "center") {
+              var hasScrollbar = $element.find(".scrollArea").height() < $element.find("table").height();;
+              if(lastCol[0] == el.parent()[0] && hasScrollbar) {
+                width += $element.find(".scrollArea").width() - $element.find("tbody tr").width();
+              }
             }
+
             el.css("width", width);
             var title = el.parent().attr("title");
-            if(el.children().length) {
-              title = el.find(".title .ng-scope").html();
-            }
             if(!title) {
-              title = el.html();
+              title = el.children().length ? el.find(".title .ng-scope").html() : el.html();
             }
-            el.attr("title", title);
+            el.attr("title", title.trim());
           });
           $element.find(".scrollableContainer").css("width", $element.find(".fix-table-width").width());
+          headersAreFixed.resolve();
         }
 
-        $(window).resize(fixHeaderWidths);
+        angular.element(window).on('resize', fixHeaderWidths);
 
         // when the data model changes, fix the header widths.  See the comments here:
         // http://docs.angularjs.org/api/ng.$timeout
         $scope.$watch('rows', function(newValue, oldValue) {
           if(newValue) {
-            $timeout(checkIfRendered);
-          } 
+              waitForRender().then(fixHeaderWidths)
+          }
         });
 
+        this.addHidableColumn = function(key, title) {
+          $scope.grid.hidableColumns.push({key: key, title: title});
+        };
+
         $scope.$watch('grid.hiddenColumns', function(newValue) {
-          if(newValue) {
-            $timeout(checkIfRendered);
-          }
+          waitForRender().then(fixHeaderWidths)
         }, true);
 
         $scope.asc = !$attrs.hasOwnProperty("desc");
         $scope.sortAttr = $attrs.sortAttr;
+
+        $element.find(".scrollArea").scroll(function(event)
+        {
+          $element.find("thead th .th-inner").css('margin-left', 0 - event.target.scrollLeft);
+        });
       }]
     };
   }])
-  .directive('sortableHeader', ['translateFilter', function(translateFilter) {
+  .directive('sortableHeader', function() {
     return { 
       transclude: true,
       scope: true,
@@ -137,15 +161,16 @@
           '</span>' + 
         '</div>',
       link: function(scope, elm, attrs, tableController) {
-        var column;
+        var expr = attrs.on || "a as a." + attrs.col,
+            column;
         scope.isActive = function() {
-          return tableController.getSortCol() === attrs.col;
+          return tableController.getSortExpr() === expr;
         };
         scope.toggleSort = function() {
           if(scope.isActive()) {
             tableController.toggleSort();
           } else {
-            tableController.setSortCol(attrs.col);
+            tableController.setSortExpr(expr);
           }
           tableController.doSort(scope[attrs.comparatorFn]);
         };
@@ -165,15 +190,14 @@
         };
 
         if (attrs.hidable) {
-          var column = elm.find('.title > span');
+          column = elm.find('.title > span');
           if (!column.length) {
             column = elm;
           }
-
           tableController.addHidableColumn(attrs.col, column.attr('translate') ? column.attr('translate') : column.text());
         }
       }
     };
-  }])
+  })
   ;
 })(angular);
